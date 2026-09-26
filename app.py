@@ -2,7 +2,8 @@ import os
 import json
 import random
 import threading
-from flask import Flask, render_template_string, request, redirect, url_for, session
+from datetime import datetime
+from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
 import requests
 import gspread
 from google.oauth2.service_account import Credentials
@@ -54,7 +55,7 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-# Google Sheets Setup
+# Google Sheets Setup (Using your exact sheet name: Namma Chennai Rooms Leads)
 SCOPE = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -74,7 +75,7 @@ def get_google_sheet():
         if creds_dict:
             creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
             client = gspread.authorize(creds)
-            sheet = client.open("Namma Chennai Rooms Sheet API").sheet1
+            sheet = client.open("Namma Chennai Rooms Leads").sheet1
             return sheet
     except Exception as e:
         print("Google Sheet Connection Error:", e)
@@ -252,11 +253,11 @@ HTML_TEMPLATE = """
                             }
                         });
                     } else {
-                        alert("Error creating payment session.");
+                        alert("Checkout Error: " + (data.message || JSON.stringify(data)));
                     }
                 } catch (err) {
                     console.error(err);
-                    alert("An error occurred during checkout.");
+                    alert("An error occurred during checkout: " + err.message);
                 }
             }
         </script>
@@ -407,11 +408,16 @@ def post_step3():
     if not phone or not phone.isdigit() or len(phone) != 10:
         return "<script>alert('Phone number must be exactly 10 digits!'); window.history.back();</script>"
 
-    # Save to Google Sheets
+    session['lead_name'] = name
+    session['lead_phone'] = phone
+    session['lead_prop'] = prop_id
+
+    # Append to Google Sheets matching your 6 columns: [Timestamp, Name, Phone Number, Room Details, Current Step, Payment Status]
     try:
         sheet = get_google_sheet()
         if sheet:
-            sheet.append_row([name, phone, prop_id, "Reached Payment"])
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sheet.append_row([timestamp, name, phone, prop_id, "Step 3 - Reached Payment", "Pending"])
     except Exception as e:
         print("Sheet Error:", e)
 
@@ -439,9 +445,12 @@ def create_payment():
             "order_amount": amount,
             "order_currency": "INR",
             "customer_details": {
-                "customer_id": "user_chennai_01",
-                "customer_phone": "9999999999",
+                "customer_id": "cust_" + str(random.randint(1000, 9999)),
+                "customer_phone": session.get('lead_phone', '9999999999'),
                 "customer_email": "user@nammachennairooms.com"
+            },
+            "order_meta": {
+                "return_url": "https://namma-chennai-rooms.onrender.com/"
             },
             "order_note": f"Booking for Property {prop_id} - Namma Chennai Rooms"
         }
@@ -452,16 +461,19 @@ def create_payment():
 
 @app.route("/success", methods=["GET"])
 def payment_success():
-    prop_id = request.args.get("prop_id", "")
-    name = request.args.get("name", "")
+    prop_id = request.args.get("prop_id", "") or session.get('lead_prop', '')
+    name = request.args.get("name", "") or session.get('lead_name', 'User')
+    phone = session.get('lead_phone', 'N/A')
     data = load_db()
     
+    # Update Google Sheets on successful payment matching your 6 columns
     try:
         sheet = get_google_sheet()
         if sheet:
-            sheet.append_row([name, "Verified via Cashfree", prop_id, "Payment Success & Unlocked"])
-    except:
-        pass
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sheet.append_row([timestamp, name, phone, prop_id, "Completed", "Success Paid"])
+    except Exception as e:
+        print("Sheet Success Error:", e)
 
     success_msg = f"✅ Payment Verified Successfully (Cashfree)!\nProperty: {prop_id}\nName: {name}"
     threading.Thread(target=send_telegram_async, args=(success_msg,)).start()
