@@ -405,7 +405,11 @@ def verify_payment():
         return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone, upi_id=data["settings"]["upi_id"], error="Please upload a payment screenshot!")
 
     data = load_db()
-    target_upi = data["settings"]["upi_id"].strip().lower()
+    target_upi = data["settings"]["upi_id"].strip().lower() # e.g. logeshkrishnan157-1@okicici
+    # Extract the unique ending signature part like "57-1@okicici" or just "@okicici" to match GPay masked text
+    upi_parts = target_upi.split('@')
+    domain = upi_parts[1] if len(upi_parts) > 1 else "okicici"
+    prefix_suffix = upi_parts[0][-4:] # takes last 4 chars like "57-1"
 
     # Save temp file to run OCR scan
     temp_path = "temp_screenshot.jpg"
@@ -417,14 +421,18 @@ def verify_payment():
         extracted_text = pytesseract.image_to_string(img).lower()
         os.remove(temp_path)
 
-        # Check if target UPI ID exists in the screenshot text
-        if target_upi in extracted_text or "okicici" in extracted_text or "50" in extracted_text:
+        # Flexible verification supporting GPay masked format (e.g. "....57-1@okicici")
+        has_domain = domain in extracted_text
+        has_prefix = prefix_suffix in extracted_text
+        has_amount = "50" in extracted_text
+
+        if (has_domain and has_prefix) or has_amount or target_upi in extracted_text:
             save_lead_to_csv({"name": name, "phone": phone, "prop_id": prop_id, "status": "Payment Verified & Unlocked"})
             success_msg = f"✅ Payment Verified Successfully!\nProperty: {prop_id}\nName: {name}\nPhone: {phone}"
             threading.Thread(target=send_telegram_async, args=(success_msg,)).start()
             return render_template_string(HTML_TEMPLATE, page="success", prop_id=prop_id, name=name, wa_number=data["settings"]["wa_number"])
         else:
-            return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone, upi_id=data["settings"]["upi_id"], error="Invalid Screenshot! Your UPI ID / Payment details were not found in this image. Please upload a valid GPay/PhonePe screenshot.")
+            return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone, upi_id=data["settings"]["upi_id"], error="Invalid Screenshot! Your transaction details were not clearly matched. Please upload a clear GPay/PhonePe screenshot showing ₹50 payment.")
     except Exception as e:
         if os.path.exists(temp_path):
             os.remove(temp_path)
