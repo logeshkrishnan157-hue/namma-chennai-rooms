@@ -249,7 +249,8 @@ HTML_TEMPLATE = """
                                 alert("Payment Failed or Cancelled: " + result.error.message);
                             }
                             if (result.paymentDetails) {
-                                window.location.href = "/success?prop_id={{ prop_id }}&name={{ name }}";
+                                // Pass name, phone, prop_id securely via URL params to success page
+                                window.location.href = "/success?prop_id={{ prop_id }}&name={{ name }}&phone={{ phone }}";
                             }
                         });
                     } else {
@@ -268,9 +269,9 @@ HTML_TEMPLATE = """
         <h2>Payment Successful! 🎉</h2>
         <div class="success-msg">
             <p style="font-size: 14px; color: #2e7d32; margin-bottom: 15px; font-weight: bold;">
-                ✅ Payment Verified Successfully via Cashfree! Click below to open WhatsApp and send details to the owner:
+                ✅ Payment Verified Successfully via Cashfree! Click below to open WhatsApp and send complete details to the owner:
             </p>
-            <a href="https://wa.me/{{ wa_number }}?text=Hi,%20I%20successfully%20completed%20Rs.50%20payment%20for%20property%20{{ prop_id }}.%20My%20Name:%20{{ name }}" target="_blank">
+            <a href="https://wa.me/{{ wa_number }}?text={{ wa_message | urlencode }}" target="_blank">
                 <button style="background: #25D366; font-size: 16px;">💬 Open WhatsApp Now</button>
             </a>
         </div>
@@ -408,11 +409,7 @@ def post_step3():
     if not phone or not phone.isdigit() or len(phone) != 10:
         return "<script>alert('Phone number must be exactly 10 digits!'); window.history.back();</script>"
 
-    session['lead_name'] = name
-    session['lead_phone'] = phone
-    session['lead_prop'] = prop_id
-
-    # Append to Google Sheets matching your 6 columns: [Timestamp, Name, Phone Number, Room Details, Current Step, Payment Status]
+    # Save to Google Sheets (Step 3: Reached Payment)
     try:
         sheet = get_google_sheet()
         if sheet:
@@ -446,7 +443,7 @@ def create_payment():
             "order_currency": "INR",
             "customer_details": {
                 "customer_id": "cust_" + str(random.randint(1000, 9999)),
-                "customer_phone": session.get('lead_phone', '9999999999'),
+                "customer_phone": "9999999999",
                 "customer_email": "user@nammachennairooms.com"
             },
             "order_meta": {
@@ -461,10 +458,13 @@ def create_payment():
 
 @app.route("/success", methods=["GET"])
 def payment_success():
-    prop_id = request.args.get("prop_id", "") or session.get('lead_prop', '')
-    name = request.args.get("name", "") or session.get('lead_name', 'User')
-    phone = session.get('lead_phone', 'N/A')
+    prop_id = request.args.get("prop_id", "CHTY01")
+    name = request.args.get("name", "User")
+    phone = request.args.get("phone", "N/A")
+    
     data = load_db()
+    properties = data["properties"]
+    prop_info = properties.get(prop_id, {"title": "Standard Room", "rent": 0, "advance": 0, "members": "N/A"})
     
     # Update Google Sheets on successful payment matching your 6 columns
     try:
@@ -475,10 +475,13 @@ def payment_success():
     except Exception as e:
         print("Sheet Success Error:", e)
 
-    success_msg = f"✅ Payment Verified Successfully (Cashfree)!\nProperty: {prop_id}\nName: {name}"
+    # Detailed WhatsApp message containing user and property info
+    wa_message = f"Hi, I have completed my ₹50 payment for property booking!\n\n📋 *Booking Details:*\n• Property ID: {prop_id}\n• Property Title: {prop_info['title']}\n• Rent: ₹{prop_info['rent']}\n• Advance: ₹{prop_info['advance']}\n• Allowed Members: {prop_info['members']}\n\n👤 *My Details:*\n• Name: {name}\n• Phone: {phone}"
+
+    success_msg = f"✅ Payment Verified Successfully (Cashfree)!\nProperty: {prop_id} ({prop_info['title']})\nName: {name}"
     threading.Thread(target=send_telegram_async, args=(success_msg,)).start()
 
-    return render_template_string(HTML_TEMPLATE, page="success", prop_id=prop_id, name=name, wa_number=data["settings"]["wa_number"])
+    return render_template_string(HTML_TEMPLATE, page="success", prop_id=prop_id, name=name, wa_number=data["settings"]["wa_number"], wa_message=wa_message)
 
 @app.route("/admin", methods=["GET"])
 def admin_panel():
