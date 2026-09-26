@@ -97,7 +97,8 @@ HTML_TEMPLATE = """
         .section-box { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #ddd; }
         .btn-danger { background: #dc3545; }
         .btn-danger:hover { background: #c82333; }
-        .qr-img { width: 160px; max-width: 100%; height: auto; border-radius: 8px; border: 2px solid #ddd; padding: 5px; }
+        .qr-img { width: 160px; max-width: 100%; height: auto; border-radius: 8px; border: 2px solid #ddd; padding: 5px; display: inline-block; cursor: pointer; transition: transform 0.1s; }
+        .qr-img:active { transform: scale(0.96); }
 
         /* LEFT SIDE ORAMA KUTTY ADMIN BAR */
         #secretAdminBar {
@@ -205,12 +206,15 @@ HTML_TEMPLATE = """
         <div class="step-indicator">Step 4 of 4</div>
         <h2>Instant UPI Payment</h2>
         <div style="text-align: center; margin-bottom: 20px;">
-            <p style="font-size: 14px; color: #555;">Scan QR & pay <b>₹50</b> registration fee:</p>
+            <p style="font-size: 14px; color: #555;">Tap QR code or click below to pay <b>₹50</b>:</p>
             
             <a href="{{ upi_link }}" class="upi-btn" target="_blank" onclick="unlockWhatsApp()">⚡ Pay ₹50 via UPI App (GPay/PhonePe)</a>
             
             <div style="margin: 15px 0;">
-                <img src="{{ url_for('static', filename='qr.jpg') }}" alt="Google Pay QR" class="qr-img">
+                <a href="{{ upi_link }}" target="_blank" onclick="unlockWhatsApp()" title="Tap to pay via UPI app">
+                    <img src="{{ url_for('static', filename='qr.jpg') }}" alt="Google Pay QR" class="qr-img">
+                </a>
+                <p style="font-size: 12px; color: #777; margin-top: 4px;">(Tap QR Code to open UPI App directly)</p>
                 <p style="font-size: 13px; color: #555; margin-top: 5px;"><b>UPI ID:</b> logeshkrishnan157-1@okicici</p>
             </div>
             
@@ -225,7 +229,7 @@ HTML_TEMPLATE = """
 
             <div id="waLockMsg" style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-top: 20px; border: 1px solid #ffeeba;">
                 <p style="font-size: 13px; color: #856404; margin: 0; font-weight: bold;">
-                    🔒 WhatsApp contact is locked. Click the <b>"Pay ₹50 via UPI App"</b> button above first to unlock it!
+                    🔒 WhatsApp contact is locked. Click the button or tap the QR code above first to unlock it!
                 </p>
             </div>
         </div>
