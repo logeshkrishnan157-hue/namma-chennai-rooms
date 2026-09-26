@@ -1,0 +1,24 @@
+{
+    "settings": {
+        "upi_id": "logeshkrishnan157-1@okicici",
+        "wa_number": "9025034415"
+    },
+    "properties": {
+        "CHTY01": {
+            "title": "2 BHK in Velachery",
+            "rent": 18000,
+            "advance": 60000,
+            "electricity": 8,
+            "members": "3 to 4 Members",
+            "is_sold": false
+        },
+        "CHTY03": {
+            "title": "2 BHK Rooms in Mylapore",
+            "rent": 22000,
+            "advance": 80000,
+            "electricity": 9,
+            "members": "2 to 3 Members",
+            "is_sold": false
+        }
+    }
+}
