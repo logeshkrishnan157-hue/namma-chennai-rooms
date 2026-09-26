@@ -1,4 +1,6 @@
 Flask
 requests
+gspread
+google-auth
 Pillow
 pytesseract
