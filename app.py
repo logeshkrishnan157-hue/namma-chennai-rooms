@@ -18,8 +18,10 @@ TELEGRAM_CHAT_ID = "6269474117"
 CASHFREE_APP_ID = "TEST11266601795c7fce6a401c75e9d810666211"
 CASHFREE_SECRET_KEY = "cfsk_ma_test_ea1f7c93499c2604d0376ff7e0343d7d_0ce01973"
 
-DB_FILE = "database.json"
-LEADS_CSV = "leads.csv"
+# Absolute paths to ensure files are created in the correct folder
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, "database.json")
+LEADS_CSV = os.path.join(BASE_DIR, "leads.csv")
 
 def load_db():
     if not os.path.exists(DB_FILE):
