@@ -387,8 +387,9 @@ HTML_TEMPLATE = """
 
 @app.route("/", methods=["GET"])
 def step1():
-    followed = session.get('followed', 'yes')
-    return render_template_string(HTML_TEMPLATE, page="step1", followed=followed)
+    session.clear()
+    session['followed'] = 'yes'
+    return render_template_string(HTML_TEMPLATE, page="step1", followed='yes')
 
 @app.route("/step1", methods=["POST"])
 def post_step1():
@@ -448,11 +449,22 @@ def step3():
         msg = f"🔥 Hot Lead (Reached Payment)!\nProperty: {prop_id}\nName: {name}\nPhone: {phone}"
         threading.Thread(target=send_telegram_async, args=(msg,)).start()
 
-        return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone)
+        return redirect(url_for("payment_page"))
         
     name = session.get('lead_name', '')
     phone = session.get('lead_phone', '')
     return render_template_string(HTML_TEMPLATE, page="step3", prop_id=prop_id, name=name, phone=phone, followed=followed)
+
+@app.route("/payment", methods=["GET"])
+def payment_page():
+    prop_id = session.get('lead_prop', 'CHTY01')
+    name = session.get('lead_name', '')
+    phone = session.get('lead_phone', '')
+    
+    if not name or not phone:
+        return redirect(url_for("step3"))
+        
+    return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone)
 
 @app.route("/create-payment", methods=["POST"])
 def create_payment():
