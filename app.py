@@ -210,7 +210,7 @@ HTML_TEMPLATE = """
             <a href="{{ upi_link }}" class="upi-btn" target="_blank" onclick="unlockWhatsApp()">⚡ Pay ₹50 via UPI App (GPay/PhonePe)</a>
             
             <div style="margin: 15px 0;">
-                <img src="{{ url_for('static', filename='qr.jpg') }}" alt="Google Pay QR" class="qr-img">
+                <img src="/qr.jpg" alt="Google Pay QR" class="qr-img">
                 <p style="font-size: 13px; color: #555; margin-top: 5px;"><b>UPI ID:</b> logeshkrishnan157-1@okicici</p>
             </div>
             
@@ -380,7 +380,8 @@ def post_step3():
     
     save_lead_to_csv({"name": name, "phone": phone, "prop_id": prop_id, "status": "Reached Payment (Hot Lead)"})
     
-    upi_link = f"upi://pay?pa={settings['upi_id']}&pn=NammaChennaiRooms&am=50&cu=INR&tn=Property_{prop_id}"
+    # Underscore removed here to avoid banking restrictions on notes
+    upi_link = f"upi://pay?pa={settings['upi_id']}&pn=NammaChennaiRooms&am=50&cu=INR&tn=Property{prop_id}"
     
     msg = f"🔥 Hot Lead (Reached Payment)!\nProperty: {prop_id}\nName: {name}\nPhone: {phone}"
     threading.Thread(target=send_telegram_async, args=(msg,)).start()
