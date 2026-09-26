@@ -4,6 +4,8 @@ import csv
 import threading
 from flask import Flask, render_template_string, request, redirect, url_for, session
 import requests
+from PIL import Image
+import pytesseract
 
 app = Flask(__name__)
 app.secret_key = "lokesh_secret_key_render_final"
@@ -80,12 +82,13 @@ HTML_TEMPLATE = """
         .property-box p { margin: 8px 0; }
         .form-group { margin-bottom: 18px; }
         label { display: block; font-weight: 600; margin-bottom: 6px; color: #333; font-size: 14px; }
-        select, input[type="text"], input[type="number"], input[type="tel"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #ccd0d5; border-radius: 8px; font-size: 16px; background: #fff; }
+        select, input[type="text"], input[type="number"], input[type="tel"], input[type="password"], input[type="file"] { width: 100%; padding: 12px; border: 1px solid #ccd0d5; border-radius: 8px; font-size: 16px; background: #fff; }
         button { background: #28a745; color: white; border: none; padding: 14px; width: 100%; font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
         button:hover { background: #218838; }
         .download-btn { background: #007bff; display: inline-block; text-align: center; color: white; text-decoration: none; padding: 10px 15px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-top: 10px; }
         .download-btn:hover { background: #0056b3; }
-        .error { color: #d9534f; font-weight: bold; text-align: center; margin-top: 20px; }
+        .error-msg { background: #ffebee; color: #c62828; padding: 12px; border-radius: 8px; margin-top: 15px; font-size: 13px; border: 1px solid #ef9a9a; text-align: center; font-weight: bold; }
+        .success-msg { background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #c8e6c9; text-align: center; }
         .sold-banner { background: #ff4d4d; color: white; padding: 20px; text-align: center; border-radius: 8px; font-size: 18px; font-weight: bold; }
         .admin-nav { text-align: right; margin-bottom: 15px; }
         .admin-nav a { background: #e4e6eb; color: #050505; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600; }
@@ -97,7 +100,7 @@ HTML_TEMPLATE = """
         .section-box { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #ddd; }
         .btn-danger { background: #dc3545; }
         .btn-danger:hover { background: #c82333; }
-        .qr-img { width: 180px; max-width: 100%; height: auto; border-radius: 8px; border: 2px solid #ddd; padding: 5px; background: #fff; }
+        .qr-img { width: 170px; max-width: 100%; height: auto; border-radius: 8px; border: 2px solid #ddd; padding: 5px; background: #fff; }
 
         /* LEFT SIDE ORAMA KUTTY ADMIN BAR */
         #secretAdminBar {
@@ -200,47 +203,49 @@ HTML_TEMPLATE = """
             <button type="submit">Proceed to Payment ➔</button>
         </form>
 
-        <!-- ================= STEP 4: PAYMENT & GALLERY SCANNER WORKFLOW ================= -->
+        <!-- ================= STEP 4: PAYMENT & SCREENSHOT VERIFICATION ================= -->
         {% elif page == 'payment' %}
         <div class="step-indicator">Step 4 of 4</div>
-        <h2>Scan & Pay ₹50 Registration Fee</h2>
+        <h2>Scan & Verify ₹50 Payment</h2>
         <div style="text-align: center; margin-bottom: 20px;">
-            <div style="background: #e7f3ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #b6d4fe;">
-                <p style="font-size: 13px; color: #084298; margin: 0; line-height: 1.4;">
-                    📱 <b>Mobile Users:</b> Download/Screenshot this QR code, open your GPay/PhonePe scanner, and select <b>"Scan from Gallery"</b> to pay safely without any restrictions!
-                </p>
-            </div>
-
             <div style="margin: 15px 0;">
                 <img src="{{ url_for('static', filename='qr.jpg') }}" alt="Google Pay QR" class="qr-img"><br>
                 <a href="{{ url_for('static', filename='qr.jpg') }}" download="NammaChennai_QR.jpg" class="download-btn">📥 Download QR Code</a>
-                <p style="font-size: 13px; color: #555; margin-top: 10px;"><b>UPI ID:</b> logeshkrishnan157-1@okicici</p>
-            </div>
-            
-            <button type="button" onclick="unlockWhatsApp()" style="background: #4e54c8; margin-top: 10px;">✅ I Have Paid ₹50, Unlock WhatsApp</button>
-
-            <div id="waSection" style="display: none; background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #c8e6c9;">
-                <p style="font-size: 13px; color: #2e7d32; margin-bottom: 12px; font-weight: bold;">
-                    🎉 Payment completed! Click below to send your details & screenshot to WhatsApp:
-                </p>
-                <a href="https://wa.me/{{ wa_number }}?text=Hi,%20I%20successfully%20paid%20Rs.50%20registration%20fee%20for%20property%20{{ prop_id }}.%20My%20Name:%20{{ name }}%20(Here%20is%20my%20payment%20screenshot)" target="_blank">
-                    <button style="background: #25D366; font-size: 15px;">💬 Open WhatsApp & Send Screenshot</button>
-                </a>
+                <p style="font-size: 13px; color: #555; margin-top: 8px;"><b>UPI ID to Pay:</b> <code>{{ upi_id }}</code></p>
             </div>
 
-            <div id="waLockMsg" style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-top: 20px; border: 1px solid #ffeeba;">
-                <p style="font-size: 13px; color: #856404; margin: 0; font-weight: bold;">
-                    🔒 WhatsApp is locked. Complete the ₹50 payment using the QR code above and click the green button to unlock!
-                </p>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: left;">
+                <form method="POST" action="/verify_payment" enctype="multipart/form-data">
+                    <input type="hidden" name="prop_id" value="{{ prop_id }}">
+                    <input type="hidden" name="name" value="{{ name }}">
+                    <input type="hidden" name="phone" value="{{ phone }}">
+                    
+                    <label style="color: #333; font-size: 13px;">Upload Payment Screenshot:</label>
+                    <input type="file" name="screenshot" accept="image/*" required style="margin-bottom: 12px;">
+                    
+                    <button type="submit" style="background: #4e54c8; font-size: 15px;">🔍 Verify Screenshot & Unlock WhatsApp</button>
+                </form>
             </div>
+
+            {% if error %}
+            <div class="error-msg">
+                ❌ {{ error }}
+            </div>
+            {% endif %}
         </div>
 
-        <script>
-            function unlockWhatsApp() {
-                document.getElementById('waSection').style.display = 'block';
-                document.getElementById('waLockMsg').style.display = 'none';
-            }
-        </script>
+        <!-- ================= SUCCESS PAYMENT PAGE ================= -->
+        {% elif page == 'success' %}
+        <div class="step-indicator">Completed</div>
+        <h2>Payment Verified Successfully! 🎉</h2>
+        <div class="success-msg">
+            <p style="font-size: 14px; color: #2e7d32; margin-bottom: 15px; font-weight: bold;">
+                ✅ Your payment screenshot is verified! Click below to open WhatsApp and send details to the owner:
+            </p>
+            <a href="https://wa.me/{{ wa_number }}?text=Hi,%20I%20successfully%20paid%20Rs.50%20registration%20fee%20for%20property%20{{ prop_id }}.%20My%20Name:%20{{ name }}%20(Payment%20verified)" target="_blank">
+                <button style="background: #25D366; font-size: 16px;">💬 Open WhatsApp Now</button>
+            </a>
+        </div>
 
         {% elif page == 'not_followed' %}
         <div class="error">
@@ -373,7 +378,6 @@ def step2():
 @app.route("/step3", methods=["POST"])
 def post_step3():
     prop_id = request.form.get("prop_id")
-    followed = request.form.get("followed")
     name = request.form.get("name")
     phone = request.form.get("phone")
     
@@ -383,12 +387,48 @@ def post_step3():
     data = load_db()
     settings = data["settings"]
     
-    save_lead_to_csv({"name": name, "phone": phone, "prop_id": prop_id, "status": "Reached Payment (Hot Lead)"})
-    
+    save_lead_to_csv({"name": name, "phone": phone, "prop_id": prop_id, "status": "Reached Payment"})
     msg = f"🔥 Hot Lead (Reached Payment)!\nProperty: {prop_id}\nName: {name}\nPhone: {phone}"
     threading.Thread(target=send_telegram_async, args=(msg,)).start()
 
-    return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, wa_number=settings['wa_number'])
+    return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone, upi_id=settings['upi_id'])
+
+@app.route("/verify_payment", methods=["POST"])
+def verify_payment():
+    prop_id = request.form.get("prop_id")
+    name = request.form.get("name")
+    phone = request.form.get("phone")
+    
+    file = request.files.get("screenshot")
+    if not file or file.filename == "":
+        data = load_db()
+        return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone, upi_id=data["settings"]["upi_id"], error="Please upload a payment screenshot!")
+
+    data = load_db()
+    target_upi = data["settings"]["upi_id"].strip().lower()
+
+    # Save temp file to run OCR scan
+    temp_path = "temp_screenshot.jpg"
+    file.save(temp_path)
+
+    try:
+        # OCR Image processing
+        img = Image.open(temp_path)
+        extracted_text = pytesseract.image_to_string(img).lower()
+        os.remove(temp_path)
+
+        # Check if target UPI ID exists in the screenshot text
+        if target_upi in extracted_text or "okicici" in extracted_text or "50" in extracted_text:
+            save_lead_to_csv({"name": name, "phone": phone, "prop_id": prop_id, "status": "Payment Verified & Unlocked"})
+            success_msg = f"✅ Payment Verified Successfully!\nProperty: {prop_id}\nName: {name}\nPhone: {phone}"
+            threading.Thread(target=send_telegram_async, args=(success_msg,)).start()
+            return render_template_string(HTML_TEMPLATE, page="success", prop_id=prop_id, name=name, wa_number=data["settings"]["wa_number"])
+        else:
+            return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone, upi_id=data["settings"]["upi_id"], error="Invalid Screenshot! Your UPI ID / Payment details were not found in this image. Please upload a valid GPay/PhonePe screenshot.")
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone, upi_id=data["settings"]["upi_id"], error="Error processing image. Please try uploading a clear screenshot.")
 
 @app.route("/admin", methods=["GET"])
 def admin_panel():
