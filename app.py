@@ -6,6 +6,7 @@ import threading
 from datetime import datetime
 from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
 import requests
+import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "lokesh_secret_key_render_final_2026"
@@ -18,10 +19,11 @@ TELEGRAM_CHAT_ID = "6269474117"
 CASHFREE_APP_ID = "TEST11266601795c7fce6a401c75e9d810666211"
 CASHFREE_SECRET_KEY = "cfsk_ma_test_ea1f7c93499c2604d0376ff7e0343d7d_0ce01973"
 
-# Absolute paths to ensure files are created in the correct folder
+# Absolute paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "database.json")
 LEADS_CSV = os.path.join(BASE_DIR, "leads.csv")
+LEADS_EXCEL = os.path.join(BASE_DIR, "leads.xlsx")
 
 def load_db():
     if not os.path.exists(DB_FILE):
@@ -57,7 +59,8 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-def save_lead_to_csv(lead_data):
+def save_lead_to_files(lead_data):
+    # 1. Save to CSV
     file_exists = os.path.exists(LEADS_CSV)
     with open(LEADS_CSV, mode="a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -71,6 +74,26 @@ def save_lead_to_csv(lead_data):
             lead_data.get("step"),
             lead_data.get("status")
         ])
+
+    # 2. Save to Excel (.xlsx)
+    try:
+        new_row = pd.DataFrame([{
+            "Timestamp": lead_data.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "Name": lead_data.get("name"),
+            "Phone Number": lead_data.get("phone"),
+            "Room Details": lead_data.get("prop_id"),
+            "Current Step": lead_data.get("step"),
+            "Payment Status": lead_data.get("status")
+        }])
+        
+        if os.path.exists(LEADS_EXCEL):
+            df_existing = pd.read_excel(LEADS_EXCEL)
+            df_combined = pd.concat([df_existing, new_row], ignore_index=True)
+            df_combined.to_excel(LEADS_EXCEL, index=False)
+        else:
+            new_row.to_excel(LEADS_EXCEL, index=False)
+    except Exception as e:
+        print("Excel Save Error:", e)
 
 def send_telegram_async(msg):
     try:
@@ -440,7 +463,7 @@ def step3():
         session['lead_name'] = name
         session['lead_phone'] = phone
 
-        save_lead_to_csv({
+        save_lead_to_files({
             "name": name,
             "phone": phone,
             "prop_id": prop_id,
@@ -511,7 +534,7 @@ def payment_success():
     properties = data["properties"]
     prop_info = properties.get(prop_id, {"title": "Standard Room", "rent": 0, "advance": 0, "members": "N/A"})
     
-    save_lead_to_csv({
+    save_lead_to_files({
         "name": name,
         "phone": phone,
         "prop_id": prop_id,
