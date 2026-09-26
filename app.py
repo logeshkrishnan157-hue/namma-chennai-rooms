@@ -1,12 +1,11 @@
 import os
 import json
+import csv
 import random
 import threading
 from datetime import datetime
 from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
 import requests
-import gspread
-from google.oauth2.service_account import Credentials
 
 app = Flask(__name__)
 app.secret_key = "lokesh_secret_key_render_final_2026"
@@ -15,11 +14,12 @@ app.secret_key = "lokesh_secret_key_render_final_2026"
 TELEGRAM_BOT_TOKEN = "8874820853:AAGbZYqZ2Td8olEW6Cw1DJvcx6OTJCD4HgE"
 TELEGRAM_CHAT_ID = "6269474117"
 
-# Cashfree Correct Test Configurations
+# Cashfree Test Configurations
 CASHFREE_APP_ID = "TEST11266601795c7fce6a401c75e9d810666211"
 CASHFREE_SECRET_KEY = "cfsk_ma_test_ea1f7c93499c2604d0376ff7e0343d7d_0ce01973"
 
 DB_FILE = "database.json"
+LEADS_CSV = "leads.csv"
 
 def load_db():
     if not os.path.exists(DB_FILE):
@@ -55,31 +55,20 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-# Google Sheets Setup
-SCOPE = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-def get_google_sheet():
-    try:
-        creds_dict = None
-        if os.path.exists("apt.json.json"):
-            with open("apt.json.json", "r") as f:
-                creds_dict = json.load(f)
-        else:
-            creds_env = os.environ.get("GOOGLE_CREDS_JSON")
-            if creds_env:
-                creds_dict = json.loads(creds_env)
-                
-        if creds_dict:
-            creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
-            client = gspread.authorize(creds)
-            sheet = client.open("Namma Chennai Rooms Leads").sheet1
-            return sheet
-    except Exception as e:
-        print("Google Sheet Connection Error:", e)
-    return None
+def save_lead_to_csv(lead_data):
+    file_exists = os.path.exists(LEADS_CSV)
+    with open(LEADS_CSV, mode="a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["Timestamp", "Name", "Phone Number", "Room Details", "Current Step", "Payment Status"])
+        writer.writerow([
+            lead_data.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            lead_data.get("name"),
+            lead_data.get("phone"),
+            lead_data.get("prop_id"),
+            lead_data.get("step"),
+            lead_data.get("status")
+        ])
 
 def send_telegram_async(msg):
     try:
@@ -98,7 +87,7 @@ HTML_TEMPLATE = """
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; color: #333; position: relative; min-height: 100vh; }
-        .container { width: 100%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); margin: 20px auto; }
+        .container { width: 100%; max-width: 480px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); margin: 30px auto; }
         h2, h3 { color: #1a1a1a; text-align: center; margin-top: 10px; font-size: 22px; }
         .property-box { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #007bff; font-size: 14px; line-height: 1.5; }
         .property-box p { margin: 8px 0; }
@@ -109,10 +98,18 @@ HTML_TEMPLATE = """
         button:hover { background: #218838; }
         .success-msg { background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #c8e6c9; text-align: center; }
         .sold-banner { background: #ff4d4d; color: white; padding: 20px; text-align: center; border-radius: 8px; font-size: 18px; font-weight: bold; }
-        .admin-nav { text-align: right; margin-bottom: 15px; }
+        .admin-nav { text-align: right; margin-bottom: 10px; }
         .admin-nav a { background: #e4e6eb; color: #050505; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600; }
         .step-indicator { text-align: center; color: #65676b; font-size: 12px; font-weight: 600; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
         .section-box { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #ddd; }
+        .table-responsive { width: 100%; overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background: #f2f2f2; }
+        .badge { padding: 3px 6px; border-radius: 4px; font-weight: bold; color: white; font-size: 10px; }
+        .badge-pending { background: #f39c12; }
+        .badge-success { background: #27ae60; }
+        .badge-visit { background: #2980b9; }
         .btn-danger { background: #dc3545; }
         .btn-danger:hover { background: #c82333; }
 
@@ -137,13 +134,11 @@ HTML_TEMPLATE = """
     <div id="secretAdminBar" title="Admin Portal" onclick="window.location.href='/admin'"></div>
 
     <div class="container">
+        {% if page == 'admin' or page == 'admin_login' or page == 'admin_verify' %}
         <div class="admin-nav">
-            {% if page == 'admin' or page == 'admin_login' or page == 'admin_verify' %}
             <a href="/">🏠 Back to Portal</a>
-            {% else %}
-            <a href="/admin">⚙️ Admin Panel</a>
-            {% endif %}
         </div>
+        {% endif %}
 
         <!-- ================= STEP 1: INSTAGRAM CHECK ================= -->
         {% if page == 'step1' %}
@@ -154,8 +149,8 @@ HTML_TEMPLATE = """
                 <label style="color: #856404;">Have you followed our Instagram Page (@namma_chennai_rooms)?</label>
                 <p style="font-size: 12px; margin: 5px 0 12px 0;">If not, please follow first: <a href="https://www.instagram.com/namma_chennai_rooms/" target="_blank" style="color: #0056b3; font-weight: bold;">Click here to Follow</a></p>
                 <select name="followed" required>
-                    <option value="yes">Yes, I have followed!</option>
-                    <option value="no">No</option>
+                    <option value="yes" {% if followed == 'yes' %}selected{% endif %}>Yes, I have followed!</option>
+                    <option value="no" {% if followed == 'no' %}selected{% endif %}>No</option>
                 </select>
             </div>
             <button type="submit">Next ➔</button>
@@ -203,13 +198,13 @@ HTML_TEMPLATE = """
             
             <div class="form-group">
                 <label>Your Full Name:</label>
-                <input type="text" name="name" id="name" placeholder="Enter your name" required>
+                <input type="text" name="name" id="name" value="{{ name }}" placeholder="Enter your name" required>
             </div>
             <div class="form-group">
                 <label>WhatsApp Phone Number (Exact 10 Digits):</label>
                 <input type="tel" name="phone" id="phone" pattern="[0-9]{10}" minlength="10" maxlength="10" 
                        oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);" 
-                       placeholder="e.g. 9840123456" required>
+                       value="{{ phone }}" placeholder="e.g. 9840123456" required>
             </div>
             <button type="submit">Proceed to Payment ➔</button>
         </form>
@@ -249,7 +244,6 @@ HTML_TEMPLATE = """
                                 alert("Payment Failed or Cancelled: " + result.error.message);
                             }
                             if (result.paymentDetails) {
-                                // Pass name, phone, prop_id securely via URL params to success page
                                 window.location.href = "/success?prop_id={{ prop_id }}&name={{ name }}&phone={{ phone }}";
                             }
                         });
@@ -360,6 +354,31 @@ HTML_TEMPLATE = """
             </form>
             {% endif %}
         </div>
+
+        <h3 style="margin-top: 30px;">📋 Live Leads & Status</h3>
+        <div class="table-responsive">
+            <table>
+                <tr><th>Timestamp</th><th>Name</th><th>Phone</th><th>Prop</th><th>Step</th><th>Status</th></tr>
+                {% for lead in leads %}
+                <tr>
+                    <td>{{ lead[0] }}</td>
+                    <td>{{ lead[1] }}</td>
+                    <td>{{ lead[2] }}</td>
+                    <td>{{ lead[3] }}</td>
+                    <td>{{ lead[4] }}</td>
+                    <td>
+                        {% if 'Success' in lead[5] %}
+                            <span class="badge badge-success">{{ lead[5] }}</span>
+                        {% elif 'Pending' in lead[5] %}
+                            <span class="badge badge-pending">{{ lead[5] }}</span>
+                        {% else %}
+                            <span class="badge badge-visit">{{ lead[5] }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
         {% endif %}
     </div>
 </body>
@@ -368,18 +387,20 @@ HTML_TEMPLATE = """
 
 @app.route("/", methods=["GET"])
 def step1():
-    return render_template_string(HTML_TEMPLATE, page="step1")
+    followed = session.get('followed', 'yes')
+    return render_template_string(HTML_TEMPLATE, page="step1", followed=followed)
 
 @app.route("/step1", methods=["POST"])
 def post_step1():
     followed = request.form.get("followed")
+    session['followed'] = followed
     if followed == "no":
         return render_template_string(HTML_TEMPLATE, page="not_followed")
-    return redirect(url_for("step2", followed=followed))
+    return redirect(url_for("step2"))
 
 @app.route("/step2", methods=["GET", "POST"])
 def step2():
-    followed = request.args.get("followed") or request.form.get("followed")
+    followed = session.get('followed', 'yes')
     data = load_db()
     db = data["properties"]
     
@@ -387,41 +408,51 @@ def step2():
     if not active_keys:
         return render_template_string(HTML_TEMPLATE, page="sold")
 
-    selected_id = request.args.get("prop_id", active_keys[0])
-    prop = db.get(selected_id, db[active_keys[0]])
-    
-    if prop.get("is_sold", False):
+    selected_id = request.args.get("prop_id") or session.get('lead_prop') or active_keys[0]
+    if selected_id not in db or db[selected_id].get("is_sold", False):
         selected_id = active_keys[0]
-        prop = db[selected_id]
+        
+    prop = db[selected_id]
+    session['lead_prop'] = selected_id
 
     if request.method == "POST":
         prop_id = request.form.get("prop_id")
-        return render_template_string(HTML_TEMPLATE, page="step3", prop_id=prop_id, followed=followed)
+        session['lead_prop'] = prop_id
+        return redirect(url_for("step3"))
         
     return render_template_string(HTML_TEMPLATE, page="step2", properties=db, selected_id=selected_id, current_prop=prop, followed=followed)
 
-@app.route("/step3", methods=["POST"])
-def post_step3():
-    prop_id = request.form.get("prop_id")
-    name = request.form.get("name")
-    phone = request.form.get("phone")
+@app.route("/step3", methods=["GET", "POST"])
+def step3():
+    prop_id = session.get('lead_prop', 'CHTY01')
+    followed = session.get('followed', 'yes')
     
-    if not phone or not phone.isdigit() or len(phone) != 10:
-        return "<script>alert('Phone number must be exactly 10 digits!'); window.history.back();</script>"
+    if request.method == "POST":
+        name = request.form.get("name")
+        phone = request.form.get("phone")
+        
+        if not phone or not phone.isdigit() or len(phone) != 10:
+            return "<script>alert('Phone number must be exactly 10 digits!'); window.history.back();</script>"
 
-    # Save to Google Sheets (Step 3: Reached Payment)
-    try:
-        sheet = get_google_sheet()
-        if sheet:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            sheet.append_row([timestamp, name, phone, prop_id, "Step 3 - Reached Payment", "Pending"])
-    except Exception as e:
-        print("Sheet Error:", e)
+        session['lead_name'] = name
+        session['lead_phone'] = phone
 
-    msg = f"🔥 Hot Lead (Reached Payment)!\nProperty: {prop_id}\nName: {name}\nPhone: {phone}"
-    threading.Thread(target=send_telegram_async, args=(msg,)).start()
+        save_lead_to_csv({
+            "name": name,
+            "phone": phone,
+            "prop_id": prop_id,
+            "step": "Step 3 - Reached Payment",
+            "status": "Pending Payment"
+        })
 
-    return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone)
+        msg = f"🔥 Hot Lead (Reached Payment)!\nProperty: {prop_id}\nName: {name}\nPhone: {phone}"
+        threading.Thread(target=send_telegram_async, args=(msg,)).start()
+
+        return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone)
+        
+    name = session.get('lead_name', '')
+    phone = session.get('lead_phone', '')
+    return render_template_string(HTML_TEMPLATE, page="step3", prop_id=prop_id, name=name, phone=phone, followed=followed)
 
 @app.route("/create-payment", methods=["POST"])
 def create_payment():
@@ -443,7 +474,7 @@ def create_payment():
             "order_currency": "INR",
             "customer_details": {
                 "customer_id": "cust_" + str(random.randint(1000, 9999)),
-                "customer_phone": "9999999999",
+                "customer_phone": session.get('lead_phone', '9999999999'),
                 "customer_email": "user@nammachennairooms.com"
             },
             "order_meta": {
@@ -458,24 +489,22 @@ def create_payment():
 
 @app.route("/success", methods=["GET"])
 def payment_success():
-    prop_id = request.args.get("prop_id", "CHTY01")
-    name = request.args.get("name", "User")
-    phone = request.args.get("phone", "N/A")
+    prop_id = request.args.get("prop_id", "") or session.get('lead_prop', 'CHTY01')
+    name = request.args.get("name", "") or session.get('lead_name', 'User')
+    phone = request.args.get("phone", "") or session.get('lead_phone', 'N/A')
     
     data = load_db()
     properties = data["properties"]
     prop_info = properties.get(prop_id, {"title": "Standard Room", "rent": 0, "advance": 0, "members": "N/A"})
     
-    # Update Google Sheets on successful payment matching your 6 columns
-    try:
-        sheet = get_google_sheet()
-        if sheet:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            sheet.append_row([timestamp, name, phone, prop_id, "Completed", "Success Paid"])
-    except Exception as e:
-        print("Sheet Success Error:", e)
+    save_lead_to_csv({
+        "name": name,
+        "phone": phone,
+        "prop_id": prop_id,
+        "step": "Completed",
+        "status": "Success Paid"
+    })
 
-    # Detailed WhatsApp message containing user and property info
     wa_message = f"Hi, I have completed my ₹50 payment for property booking!\n\n📋 *Booking Details:*\n• Property ID: {prop_id}\n• Property Title: {prop_info['title']}\n• Rent: ₹{prop_info['rent']}\n• Advance: ₹{prop_info['advance']}\n• Allowed Members: {prop_info['members']}\n\n👤 *My Details:*\n• Name: {name}\n• Phone: {phone}"
 
     success_msg = f"✅ Payment Verified Successfully (Cashfree)!\nProperty: {prop_id} ({prop_info['title']})\nName: {name}"
@@ -497,7 +526,14 @@ def admin_panel():
     else:
         current_prop = db.get(edit_pid, {"title": "", "rent": "", "advance": "", "electricity": "", "members": "", "is_sold": False})
 
-    return render_template_string(HTML_TEMPLATE, page="admin", settings=data["settings"], properties=db, edit_pid=edit_pid, current_prop=current_prop)
+    leads = []
+    if os.path.exists(LEADS_CSV):
+        with open(LEADS_CSV, mode="r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            next(reader, None)
+            leads = list(reader)
+
+    return render_template_string(HTML_TEMPLATE, page="admin", settings=data["settings"], properties=db, edit_pid=edit_pid, current_prop=current_prop, leads=leads)
 
 @app.route("/admin/login", methods=["POST"])
 def admin_login():
