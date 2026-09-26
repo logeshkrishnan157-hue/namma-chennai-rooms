@@ -15,9 +15,9 @@ app.secret_key = "lokesh_secret_key_render_final_2026"
 TELEGRAM_BOT_TOKEN = "8874820853:AAGbZYqZ2Td8olEW6Cw1DJvcx6OTJCD4HgE"
 TELEGRAM_CHAT_ID = "6269474117"
 
-# Cashfree Test Configurations
+# Cashfree Correct Test Configurations
 CASHFREE_APP_ID = "TEST11266601795c7fce6a401c75e9d810666211"
-CASHFREE_SECRET_KEY = "cfsk_ma_test_ea1f7c93499c2604d0376ff7e0343d7_OceO1973"
+CASHFREE_SECRET_KEY = "cfsk_ma_test_ea1f7c93499c2604d0376ff7e0343d7d_0ce01973"
 
 DB_FILE = "database.json"
 
@@ -55,7 +55,7 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-# Google Sheets Setup (Using your exact sheet name: Namma Chennai Rooms Leads)
+# Google Sheets Setup
 SCOPE = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
