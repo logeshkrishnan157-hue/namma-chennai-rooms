@@ -4,9 +4,8 @@ import csv
 import random
 import threading
 from datetime import datetime
-from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify, send_file
 import requests
-import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "lokesh_secret_key_render_final_2026"
@@ -23,7 +22,6 @@ CASHFREE_SECRET_KEY = "cfsk_ma_test_ea1f7c93499c2604d0376ff7e0343d7d_0ce01973"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "database.json")
 LEADS_CSV = os.path.join(BASE_DIR, "leads.csv")
-LEADS_EXCEL = os.path.join(BASE_DIR, "leads.xlsx")
 
 def load_db():
     if not os.path.exists(DB_FILE):
@@ -59,8 +57,7 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-def save_lead_to_files(lead_data):
-    # 1. Save to CSV
+def save_lead_to_csv(lead_data):
     file_exists = os.path.exists(LEADS_CSV)
     with open(LEADS_CSV, mode="a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -74,26 +71,6 @@ def save_lead_to_files(lead_data):
             lead_data.get("step"),
             lead_data.get("status")
         ])
-
-    # 2. Save to Excel (.xlsx)
-    try:
-        new_row = pd.DataFrame([{
-            "Timestamp": lead_data.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "Name": lead_data.get("name"),
-            "Phone Number": lead_data.get("phone"),
-            "Room Details": lead_data.get("prop_id"),
-            "Current Step": lead_data.get("step"),
-            "Payment Status": lead_data.get("status")
-        }])
-        
-        if os.path.exists(LEADS_EXCEL):
-            df_existing = pd.read_excel(LEADS_EXCEL)
-            df_combined = pd.concat([df_existing, new_row], ignore_index=True)
-            df_combined.to_excel(LEADS_EXCEL, index=False)
-        else:
-            new_row.to_excel(LEADS_EXCEL, index=False)
-    except Exception as e:
-        print("Excel Save Error:", e)
 
 def send_telegram_async(msg):
     try:
@@ -159,7 +136,7 @@ HTML_TEMPLATE = """
     <div id="secretAdminBar" title="Admin Portal" onclick="window.location.href='/admin'"></div>
 
     <div class="container">
-        {% if page == 'admin' or page == 'admin_login' or page == 'admin_verify' %}
+        {% if page in ['admin', 'admin_login', 'admin_verify', 'download_portal', 'download_verify'] %}
         <div class="admin-nav">
             <a href="/">🏠 Back to Portal</a>
         </div>
@@ -180,6 +157,9 @@ HTML_TEMPLATE = """
             </div>
             <button type="submit">Next ➔</button>
         </form>
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="/download-portal" style="color: #007bff; font-size: 13px; text-decoration: none; font-weight: 600;">📥 Download Leads Report (OTP Secured)</a>
+        </div>
 
         <!-- ================= STEP 2: PROPERTY SELECT & DETAILS ================= -->
         {% elif page == 'step2' %}
@@ -308,6 +288,26 @@ HTML_TEMPLATE = """
             <span style="font-size: 14px; font-weight: normal;">This property has already been rented/sold out. Please check our Instagram page for more updates!</span>
         </div>
 
+        <!-- ================= DOWNLOAD PORTAL (OTP REQUEST) ================= -->
+        {% elif page == 'download_portal' %}
+        <h2>📥 Download Leads Report</h2>
+        <p style="font-size: 13px; color: #666; text-align: center; margin-bottom: 20px;">Click below to send a secure OTP to your Telegram to download the CSV file.</p>
+        <form method="POST" action="/download-portal">
+            <button type="submit" style="background: #007bff;">Send OTP to Telegram 📲</button>
+        </form>
+
+        <!-- ================= DOWNLOAD PORTAL (OTP VERIFY) ================= -->
+        {% elif page == 'download_verify' %}
+        <h2>🔐 Enter Telegram OTP</h2>
+        <p style="font-size: 13px; color: #666; text-align: center; margin-bottom: 20px;">OTP sent to your Telegram chat!</p>
+        {% if error %}<p style="color:red; text-align:center;">{{ error }}</p>{% endif %}
+        <form method="POST" action="/download-verify">
+            <div class="form-group">
+                <input type="text" name="otp" placeholder="Enter 4-digit OTP" required style="text-align:center; font-size:18px;" maxlength="4">
+            </div>
+            <button type="submit" style="background: #2ed573;">Verify & Download 📥</button>
+        </form>
+
         <!-- ================= ADMIN LOGIN ================= -->
         {% elif page == 'admin_login' %}
         <h2>🔐 Admin Login</h2>
@@ -322,7 +322,7 @@ HTML_TEMPLATE = """
         {% if error %}<p style="color:red; text-align:center;">{{ error }}</p>{% endif %}
         <form method="POST" action="/admin/verify">
             <div class="form-group">
-                <input type="text" name="otp" placeholder="Enter 4-digit OTP" required style="text-align:center; font-size:18px;">
+                <input type="text" name="otp" placeholder="Enter 4-digit OTP" required style="text-align:center; font-size:18px;" maxlength="4">
             </div>
             <button type="submit" style="background: #2ed573;">Verify OTP</button>
         </form>
@@ -381,6 +381,12 @@ HTML_TEMPLATE = """
         </div>
 
         <h3 style="margin-top: 30px;">📋 Live Leads & Status</h3>
+        <div style="margin-bottom: 15px;">
+            <a href="/download-portal" style="text-decoration: none;">
+                <button type="button" style="background: #17a2b8;">📥 Download Leads Report (OTP Secured)</button>
+            </a>
+        </div>
+
         <div class="table-responsive">
             <table>
                 <tr><th>Timestamp</th><th>Name</th><th>Phone</th><th>Prop</th><th>Step</th><th>Status</th></tr>
@@ -463,7 +469,7 @@ def step3():
         session['lead_name'] = name
         session['lead_phone'] = phone
 
-        save_lead_to_files({
+        save_lead_to_csv({
             "name": name,
             "phone": phone,
             "prop_id": prop_id,
@@ -534,7 +540,7 @@ def payment_success():
     properties = data["properties"]
     prop_info = properties.get(prop_id, {"title": "Standard Room", "rent": 0, "advance": 0, "members": "N/A"})
     
-    save_lead_to_files({
+    save_lead_to_csv({
         "name": name,
         "phone": phone,
         "prop_id": prop_id,
@@ -548,6 +554,45 @@ def payment_success():
     threading.Thread(target=send_telegram_async, args=(success_msg,)).start()
 
     return render_template_string(HTML_TEMPLATE, page="success", prop_id=prop_id, name=name, wa_number=data["settings"]["wa_number"], wa_message=wa_message)
+
+# ================= PUBLIC VISIBLE DOWNLOAD PORTAL (OTP SECURED) =================
+@app.route("/download-portal", methods=["GET", "POST"])
+def download_portal():
+    if request.method == "POST":
+        otp = str(random.randint(1000, 9999))
+        session['download_otp'] = otp
+        
+        message = f"📥 *Namma Chennai Rooms* Lead Download OTP: `{otp}`\nDo not share this with anyone!"
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "Markdown"
+        }
+        try:
+            requests.post(url, json=payload)
+            return render_template_string(HTML_TEMPLATE, page="download_verify")
+        except:
+            return render_template_string(HTML_TEMPLATE, page="download_portal")
+            
+    return render_template_string(HTML_TEMPLATE, page="download_portal")
+
+@app.route("/download-verify", methods=["POST"])
+def download_verify():
+    user_otp = request.form.get("otp")
+    if user_otp and user_otp == session.get("download_otp"):
+        session.pop("download_otp", None)
+        if not os.path.exists(LEADS_CSV):
+            save_lead_to_csv({
+                "name": "System Sample",
+                "phone": "9025034415",
+                "prop_id": "CHTY01",
+                "step": "Initialized",
+                "status": "Ready"
+            })
+        return send_file(LEADS_CSV, as_attachment=True, download_name="Namma_Chennai_Rooms_Leads.csv")
+    else:
+        return render_template_string(HTML_TEMPLATE, page="download_verify", error="Invalid OTP! Try again.")
 
 @app.route("/admin", methods=["GET"])
 def admin_panel():
