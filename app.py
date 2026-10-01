@@ -695,3 +695,4 @@ def admin_delete_property():
 if __name__ == "__main__":
     port = int(os.environ.com("PORT", 5000)) if "PORT" in os.environ else 5000
     app.run(host="0.0.0.0", port=port)
+    
