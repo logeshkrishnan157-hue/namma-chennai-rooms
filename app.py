@@ -10,13 +10,13 @@ import requests
 app = Flask(__name__)
 app.secret_key = "lokesh_secret_key_render_final_2026"
 
-# Telegram Bot Configurations
-TELEGRAM_BOT_TOKEN = "8874820853:AAGbZYqZ2Td8olEW6Cw1DJvcx6OTJCD4HgE"
-TELEGRAM_CHAT_ID = "6269474117"
+# Telegram Bot Configurations (Fetched safely from Render Environment Variables)
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# ================= CASHFREE LIVE CONFIGURATIONS =================
-CASHFREE_APP_ID = "144515177a754ced4de5cfc7c8a1515441"
-CASHFREE_SECRET_KEY = "cfsk_ma_prod_84b151ffe36f7097d8a1943563adba7_64f3ba65"
+# ================= CASHFREE LIVE CONFIGURATIONS (Fetched safely from Render) =================
+CASHFREE_APP_ID = os.environ.get("CASHFREE_APP_ID")
+CASHFREE_SECRET_KEY = os.environ.get("CASHFREE_SECRET_KEY")
 
 # Absolute paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
