@@ -14,9 +14,9 @@ app.secret_key = "lokesh_secret_key_render_final_2026"
 TELEGRAM_BOT_TOKEN = "8874820853:AAGbZYqZ2Td8olEW6Cw1DJvcx6OTJCD4HgE"
 TELEGRAM_CHAT_ID = "6269474117"
 
-# Cashfree Test Configurations
-CASHFREE_APP_ID = "TEST11266601795c7fce6a401c75e9d810666211"
-CASHFREE_SECRET_KEY = "cfsk_ma_test_ea1f7c93499c2604d0376ff7e0343d7d_0ce01973"
+# ================= CASHFREE LIVE CONFIGURATIONS =================
+CASHFREE_APP_ID = "144515177a754ced4de5cfc7c8a1515441"
+CASHFREE_SECRET_KEY = "cfsk_ma_prod_84b151ffe36f7097d8a1943563adba7_64f3ba65"
 
 # Absolute paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -214,7 +214,7 @@ HTML_TEMPLATE = """
             <button type="submit">Proceed to Payment ➔</button>
         </form>
 
-        <!-- ================= STEP 4: CASHFREE UPI PAYMENT ================= -->
+        <!-- ================= STEP 4: CASHFREE PRODUCTION UPI PAYMENT ================= -->
         {% elif page == 'payment' %}
         <div class="step-indicator">Step 4 of 4</div>
         <h2>Instant UPI Payment</h2>
@@ -226,7 +226,8 @@ HTML_TEMPLATE = """
         </div>
 
         <script>
-            const cashfree = Cashfree({ mode: "sandbox" });
+            // PRODUCTION MODE ENABLED
+            const cashfree = Cashfree({ mode: "production" });
 
             async function startPayment() {
                 try {
@@ -504,7 +505,8 @@ def create_payment():
         prop_id = req_data.get('prop_id', 'CHTY01')
         amount = float(req_data.get('amount', 50.00))
         
-        url = "https://sandbox.cashfree.com/pg/orders"
+        # PRODUCTION API URL
+        url = "https://api.cashfree.com/pg/orders"
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
@@ -550,12 +552,12 @@ def payment_success():
 
     wa_message = f"Hi, I have completed my ₹50 payment for property booking!\n\n📋 *Booking Details:*\n• Property ID: {prop_id}\n• Property Title: {prop_info['title']}\n• Rent: ₹{prop_info['rent']}\n• Advance: ₹{prop_info['advance']}\n• Allowed Members: {prop_info['members']}\n\n👤 *My Details:*\n• Name: {name}\n• Phone: {phone}"
 
-    success_msg = f"✅ Payment Verified Successfully (Cashfree)!\nProperty: {prop_id} ({prop_info['title']})\nName: {name}"
+    success_msg = f"✅ Payment Verified Successfully (Cashfree Live)!\nProperty: {prop_id} ({prop_info['title']})\nName: {name}"
     threading.Thread(target=send_telegram_async, args=(success_msg,)).start()
 
     return render_template_string(HTML_TEMPLATE, page="success", prop_id=prop_id, name=name, wa_number=data["settings"]["wa_number"], wa_message=wa_message)
 
-# ================= PUBLIC VISIBLE DOWNLOAD PORTAL (OTP SECURED) =================
+# ================= DOWNLOAD PORTAL (OTP SECURED) =================
 @app.route("/download-portal", methods=["GET", "POST"])
 def download_portal():
     if request.method == "POST":
@@ -691,5 +693,5 @@ def admin_delete_property():
     return redirect(url_for("admin_panel"))
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.com("PORT", 5000)) if "PORT" in os.environ else 5000
     app.run(host="0.0.0.0", port=port)
