@@ -226,7 +226,6 @@ HTML_TEMPLATE = """
         </div>
 
         <script>
-            // PRODUCTION MODE ENABLED
             const cashfree = Cashfree({ mode: "production" });
 
             async function startPayment() {
@@ -505,7 +504,6 @@ def create_payment():
         prop_id = req_data.get('prop_id', 'CHTY01')
         amount = float(req_data.get('amount', 50.00))
         
-        # PRODUCTION API URL
         url = "https://api.cashfree.com/pg/orders"
         headers = {
             "accept": "application/json",
@@ -557,7 +555,6 @@ def payment_success():
 
     return render_template_string(HTML_TEMPLATE, page="success", prop_id=prop_id, name=name, wa_number=data["settings"]["wa_number"], wa_message=wa_message)
 
-# ================= DOWNLOAD PORTAL (OTP SECURED) =================
 @app.route("/download-portal", methods=["GET", "POST"])
 def download_portal():
     if request.method == "POST":
@@ -693,6 +690,5 @@ def admin_delete_property():
     return redirect(url_for("admin_panel"))
 
 if __name__ == "__main__":
-    port = int(os.environ.com("PORT", 5000)) if "PORT" in os.environ else 5000
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-    
