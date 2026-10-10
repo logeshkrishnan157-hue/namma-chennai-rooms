@@ -32,16 +32,20 @@ def load_db():
             "properties": {
                 "CHTY01": {
                     "title": "2 BHK in Velachery", 
+                    "prop_type": "rent",
                     "rent": 18000, 
                     "advance": 60000, 
+                    "lease_amount": 0,
                     "electricity": 8,
                     "members": "3 to 4 Members",
                     "is_sold": False
                 },
                 "CHTY03": {
                     "title": "2 BHK Rooms in Mylapore", 
-                    "rent": 22000, 
-                    "advance": 80000, 
+                    "prop_type": "lease",
+                    "rent": 0, 
+                    "advance": 0, 
+                    "lease_amount": 500000,
                     "electricity": 9,
                     "members": "2 to 3 Members",
                     "is_sold": False
@@ -142,31 +146,11 @@ HTML_TEMPLATE = """
         </div>
         {% endif %}
 
-        <!-- ================= STEP 1: INSTAGRAM CHECK ================= -->
+        <!-- ================= STEP 1: PROPERTY SELECT & DETAILS ================= -->
         {% if page == 'step1' %}
-        <div class="step-indicator">Step 1 of 4</div>
-        <h2>Namma Chennai Rooms</h2>
-        <form method="POST" action="/step1">
-            <div class="form-group" style="background: #fff8e1; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba;">
-                <label style="color: #856404;">Have you followed our Instagram Page (@namma_chennai_rooms)?</label>
-                <p style="font-size: 12px; margin: 5px 0 12px 0;">If not, please follow first: <a href="https://www.instagram.com/namma_chennai_rooms/" target="_blank" style="color: #0056b3; font-weight: bold;">Click here to Follow</a></p>
-                <select name="followed" required>
-                    <option value="yes" {% if followed == 'yes' %}selected{% endif %}>Yes, I have followed!</option>
-                    <option value="no" {% if followed == 'no' %}selected{% endif %}>No</option>
-                </select>
-            </div>
-            <button type="submit">Next ➔</button>
-        </form>
-        <div style="text-align: center; margin-top: 20px;">
-            <a href="/download-portal" style="color: #007bff; font-size: 13px; text-decoration: none; font-weight: 600;">📥 Download Leads Report (OTP Secured)</a>
-        </div>
-
-        <!-- ================= STEP 2: PROPERTY SELECT & DETAILS ================= -->
-        {% elif page == 'step2' %}
-        <div class="step-indicator">Step 2 of 4</div>
+        <div class="step-indicator">Step 1 of 3</div>
         <h2>Select Property & Details</h2>
-        <form method="GET" action="/step2">
-            <input type="hidden" name="followed" value="{{ followed }}">
+        <form method="GET" action="/">
             <div class="form-group">
                 <label>Choose Property:</label>
                 <select name="prop_id" onchange="this.form.submit()">
@@ -181,25 +165,31 @@ HTML_TEMPLATE = """
 
         <div class="property-box">
             <p><strong>Title:</strong> {{ current_prop.title }}</p>
+            <p><strong>Type:</strong> <span style="text-transform: uppercase; font-weight: bold; color: #007bff;">{{ current_prop.get('prop_type', 'rent') }}</span></p>
+            {% if current_prop.get('prop_type', 'rent') == 'lease' %}
+            <p><strong>Lease Amount:</strong> ₹{{ current_prop.lease_amount }}</p>
+            {% else %}
             <p><strong>Rent:</strong> ₹{{ current_prop.rent }}</p>
             <p><strong>Advance:</strong> ₹{{ current_prop.advance }}</p>
             <p><strong>Electricity:</strong> ₹{{ current_prop.electricity }}/unit</p>
+            {% endif %}
             <p><strong>Allowed Members:</strong> {{ current_prop.members }}</p>
         </div>
 
-        <form method="POST" action="/step2">
+        <form method="POST" action="/step1">
             <input type="hidden" name="prop_id" value="{{ selected_id }}">
-            <input type="hidden" name="followed" value="{{ followed }}">
             <button type="submit">Next ➔</button>
         </form>
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="/download-portal" style="color: #007bff; font-size: 13px; text-decoration: none; font-weight: 600;">📥 Download Leads Report (OTP Secured)</a>
+        </div>
 
-        <!-- ================= STEP 3: NAME & STRICT 10-DIGIT PHONE ================= -->
-        {% elif page == 'step3' %}
-        <div class="step-indicator">Step 3 of 4</div>
+        <!-- ================= STEP 2: NAME & STRICT 10-DIGIT PHONE ================= -->
+        {% elif page == 'step2' %}
+        <div class="step-indicator">Step 2 of 3</div>
         <h2>Your Details</h2>
-        <form method="POST" action="/step3">
+        <form method="POST" action="/step2">
             <input type="hidden" name="prop_id" value="{{ prop_id }}">
-            <input type="hidden" name="followed" value="{{ followed }}">
             
             <div class="form-group">
                 <label>Your Full Name:</label>
@@ -214,9 +204,9 @@ HTML_TEMPLATE = """
             <button type="submit">Proceed to Payment ➔</button>
         </form>
 
-        <!-- ================= STEP 4: CASHFREE PRODUCTION UPI PAYMENT ================= -->
+        <!-- ================= STEP 3: CASHFREE PRODUCTION UPI PAYMENT ================= -->
         {% elif page == 'payment' %}
-        <div class="step-indicator">Step 4 of 4</div>
+        <div class="step-indicator">Step 3 of 3</div>
         <h2>Instant UPI Payment</h2>
         <div style="text-align: center; margin-bottom: 20px;">
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
@@ -275,17 +265,10 @@ HTML_TEMPLATE = """
             </a>
         </div>
 
-        {% elif page == 'not_followed' %}
-        <div style="background: #ffebee; color: #c62828; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ef9a9a;">
-            <h3>⚠️ Please Follow Our Page First!</h3>
-            <p style="font-size: 14px; margin-top: 10px;">To view property details and book house visits, you must follow our Instagram page.</p>
-            <a href="/"><button style="margin-top: 15px; background: #007bff;">⬅️ Back to Start</button></a>
-        </div>
-
         {% elif page == 'sold' %}
         <div class="sold-banner">
             🚫 Property Sold Out!<br><br>
-            <span style="font-size: 14px; font-weight: normal;">This property has already been rented/sold out. Please check our Instagram page for more updates!</span>
+            <span style="font-size: 14px; font-weight: normal;">This property has already been rented/sold out. Please check back later!</span>
         </div>
 
         <!-- ================= DOWNLOAD PORTAL (OTP REQUEST) ================= -->
@@ -363,14 +346,45 @@ HTML_TEMPLATE = """
                     <input type="text" name="pid" value="{% if edit_pid != 'NEW' %}{{ edit_pid }}{% endif %}" {% if edit_pid != 'NEW' %}readonly style="background:#e9ecef;"{% endif %} required>
                 </div>
                 <div class="form-group"><label>Title:</label><input type="text" name="title" value="{{ current_prop.title }}" required></div>
-                <div class="form-group"><label>Rent (₹):</label><input type="number" name="rent" value="{{ current_prop.rent }}" required></div>
-                <div class="form-group"><label>Advance (₹):</label><input type="number" name="advance" value="{{ current_prop.advance }}" required></div>
-                <div class="form-group"><label>Electricity per unit (₹):</label><input type="number" name="electricity" value="{{ current_prop.electricity }}" required></div>
+                
+                <!-- RENT VS LEASE RADIO BUTTONS -->
+                <div class="form-group" style="background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 6px;">
+                    <label>Listing Type:</label>
+                    <label style="display: inline-block; margin-right: 15px; font-weight: normal;">
+                        <input type="radio" name="prop_type" value="rent" {% if current_prop.get('prop_type', 'rent') == 'rent' %}checked{% endif %} onclick="togglePropType('rent')"> Rent
+                    </label>
+                    <label style="display: inline-block; font-weight: normal;">
+                        <input type="radio" name="prop_type" value="lease" {% if current_prop.get('prop_type', 'rent') == 'lease' %}checked{% endif %} onclick="togglePropType('lease')"> Lease
+                    </label>
+                </div>
+
+                <div id="rentFields" style="display: {% if current_prop.get('prop_type', 'rent') == 'lease' %}none{% else %}block{% endif %};">
+                    <div class="form-group"><label>Rent (₹):</label><input type="number" name="rent" value="{{ current_prop.rent }}"></div>
+                    <div class="form-group"><label>Advance (₹):</label><input type="number" name="advance" value="{{ current_prop.advance }}"></div>
+                    <div class="form-group"><label>Electricity per unit (₹):</label><input type="number" name="electricity" value="{{ current_prop.electricity }}"></div>
+                </div>
+
+                <div id="leaseFields" style="display: {% if current_prop.get('prop_type', 'rent') == 'lease' %}block{% else %}none{% endif %};">
+                    <div class="form-group"><label>Lease Amount (₹):</label><input type="number" name="lease_amount" value="{{ current_prop.lease_amount }}"></div>
+                </div>
+
                 <div class="form-group"><label>Allowed Members:</label><input type="text" name="members" value="{{ current_prop.members }}" placeholder="e.g. 3 to 4 Members" required></div>
                 <div class="form-group"><label><input type="checkbox" name="is_sold" {% if current_prop.is_sold %}checked{% endif %}> Mark as SOLD OUT</label></div>
                 
                 <button type="submit" style="margin-bottom: 10px;">Save Property</button>
             </form>
+
+            <script>
+                function togglePropType(type) {
+                    if(type === 'rent') {
+                        document.getElementById('rentFields').style.display = 'block';
+                        document.getElementById('leaseFields').style.display = 'none';
+                    } else {
+                        document.getElementById('rentFields').style.display = 'none';
+                        document.getElementById('leaseFields').style.display = 'block';
+                    }
+                }
+            </script>
 
             {% if edit_pid != 'NEW' %}
             <form method="POST" action="/admin/delete_property" onsubmit="return confirm('Are you sure you want to delete this property?');">
@@ -418,21 +432,6 @@ HTML_TEMPLATE = """
 
 @app.route("/", methods=["GET"])
 def step1():
-    session.clear()
-    session['followed'] = 'yes'
-    return render_template_string(HTML_TEMPLATE, page="step1", followed='yes')
-
-@app.route("/step1", methods=["POST"])
-def post_step1():
-    followed = request.form.get("followed")
-    session['followed'] = followed
-    if followed == "no":
-        return render_template_string(HTML_TEMPLATE, page="not_followed")
-    return redirect(url_for("step2"))
-
-@app.route("/step2", methods=["GET", "POST"])
-def step2():
-    followed = session.get('followed', 'yes')
     data = load_db()
     db = data["properties"]
     
@@ -447,17 +446,17 @@ def step2():
     prop = db[selected_id]
     session['lead_prop'] = selected_id
 
-    if request.method == "POST":
-        prop_id = request.form.get("prop_id")
-        session['lead_prop'] = prop_id
-        return redirect(url_for("step3"))
-        
-    return render_template_string(HTML_TEMPLATE, page="step2", properties=db, selected_id=selected_id, current_prop=prop, followed=followed)
+    return render_template_string(HTML_TEMPLATE, page="step1", properties=db, selected_id=selected_id, current_prop=prop)
 
-@app.route("/step3", methods=["GET", "POST"])
-def step3():
+@app.route("/step1", methods=["POST"])
+def post_step1():
+    prop_id = request.form.get("prop_id")
+    session['lead_prop'] = prop_id
+    return redirect(url_for("step2"))
+
+@app.route("/step2", methods=["GET", "POST"])
+def step2():
     prop_id = session.get('lead_prop', 'CHTY01')
-    followed = session.get('followed', 'yes')
     
     if request.method == "POST":
         name = request.form.get("name")
@@ -473,7 +472,7 @@ def step3():
             "name": name,
             "phone": phone,
             "prop_id": prop_id,
-            "step": "Step 3 - Reached Payment",
+            "step": "Step 2 - Reached Payment",
             "status": "Pending Payment"
         })
 
@@ -484,7 +483,7 @@ def step3():
         
     name = session.get('lead_name', '')
     phone = session.get('lead_phone', '')
-    return render_template_string(HTML_TEMPLATE, page="step3", prop_id=prop_id, name=name, phone=phone, followed=followed)
+    return render_template_string(HTML_TEMPLATE, page="step2", prop_id=prop_id, name=name, phone=phone)
 
 @app.route("/payment", methods=["GET"])
 def payment_page():
@@ -493,7 +492,7 @@ def payment_page():
     phone = session.get('lead_phone', '')
     
     if not name or not phone:
-        return redirect(url_for("step3"))
+        return redirect(url_for("step2"))
         
     return render_template_string(HTML_TEMPLATE, page="payment", prop_id=prop_id, name=name, phone=phone)
 
@@ -538,7 +537,7 @@ def payment_success():
     
     data = load_db()
     properties = data["properties"]
-    prop_info = properties.get(prop_id, {"title": "Standard Room", "rent": 0, "advance": 0, "members": "N/A"})
+    prop_info = properties.get(prop_id, {"title": "Standard Room", "prop_type": "rent", "rent": 0, "advance": 0, "lease_amount": 0, "members": "N/A"})
     
     save_lead_to_csv({
         "name": name,
@@ -548,7 +547,12 @@ def payment_success():
         "status": "Success Paid"
     })
 
-    wa_message = f"Hi, I have completed my ₹50 payment for property booking!\n\n📋 *Booking Details:*\n• Property ID: {prop_id}\n• Property Title: {prop_info['title']}\n• Rent: ₹{prop_info['rent']}\n• Advance: ₹{prop_info['advance']}\n• Allowed Members: {prop_info['members']}\n\n👤 *My Details:*\n• Name: {name}\n• Phone: {phone}"
+    if prop_info.get("prop_type") == "lease":
+        details_text = f"• Type: LEASE\n• Lease Amount: ₹{prop_info.get('lease_amount', 0)}"
+    else:
+        details_text = f"• Type: RENT\n• Rent: ₹{prop_info.get('rent', 0)}\n• Advance: ₹{prop_info.get('advance', 0)}"
+
+    wa_message = f"Hi, I have completed my ₹50 payment for property booking!\n\n📋 *Booking Details:*\n• Property ID: {prop_id}\n• Property Title: {prop_info['title']}\n{details_text}\n• Allowed Members: {prop_info['members']}\n\n👤 *My Details:*\n• Name: {name}\n• Phone: {phone}"
 
     success_msg = f"✅ Payment Verified Successfully (Cashfree Live)!\nProperty: {prop_id} ({prop_info['title']})\nName: {name}"
     threading.Thread(target=send_telegram_async, args=(success_msg,)).start()
@@ -603,9 +607,9 @@ def admin_panel():
     edit_pid = request.args.get("edit_pid", "NEW")
     
     if edit_pid == "NEW":
-        current_prop = {"title": "", "rent": "", "advance": "", "electricity": "", "members": "", "is_sold": False}
+        current_prop = {"title": "", "prop_type": "rent", "rent": "", "advance": "", "lease_amount": "", "electricity": "", "members": "", "is_sold": False}
     else:
-        current_prop = db.get(edit_pid, {"title": "", "rent": "", "advance": "", "electricity": "", "members": "", "is_sold": False})
+        current_prop = db.get(edit_pid, {"title": "", "prop_type": "rent", "rent": "", "advance": "", "lease_amount": "", "electricity": "", "members": "", "is_sold": False})
 
     leads = []
     if os.path.exists(LEADS_CSV):
@@ -667,14 +671,28 @@ def admin_save_property():
         return redirect(url_for("admin_panel"))
     data = load_db()
     pid = request.form.get("pid").strip().upper()
-    data["properties"][pid] = {
+    
+    prop_type = request.form.get("prop_type", "rent")
+    
+    prop_data = {
         "title": request.form.get("title"),
-        "rent": int(request.form.get("rent")),
-        "advance": int(request.form.get("advance")),
-        "electricity": int(request.form.get("electricity")),
+        "prop_type": prop_type,
         "members": request.form.get("members"),
         "is_sold": True if request.form.get("is_sold") else False
     }
+
+    if prop_type == "lease":
+        prop_data["lease_amount"] = int(request.form.get("lease_amount") or 0)
+        prop_data["rent"] = 0
+        prop_data["advance"] = 0
+        prop_data["electricity"] = 0
+    else:
+        prop_data["rent"] = int(request.form.get("rent") or 0)
+        prop_data["advance"] = int(request.form.get("advance") or 0)
+        prop_data["electricity"] = int(request.form.get("electricity") or 0)
+        prop_data["lease_amount"] = 0
+
+    data["properties"][pid] = prop_data
     save_db(data)
     return redirect(url_for("admin_panel", edit_pid=pid))
 
